@@ -5,6 +5,7 @@ import os
 import numpy as np
 import joblib
 from tensorflow.keras.models import load_model
+import requests
 
 # -----------------------------
 # Load model and scaler
@@ -54,6 +55,32 @@ def predict_price(data: PriceInput):
 
     return {"predicted_price": float(predicted_price)}
 
+@app.get("/prices/{symbol}")
+def get_prices(symbol: str):
+    """
+    Fetch last 60 closing prices from Yahoo Finance
+    """
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=3mo&interval=1d"
+
+    headers = {
+        "User-Agent": "Mozilla/5.0"
+    }
+
+    response = requests.get(url, headers=headers)
+    data = response.json()
+
+    try:
+        closes = data["chart"]["result"][0]["indicators"]["quote"][0]["close"]
+        closes = [p for p in closes if p is not None][-60:]
+
+        if len(closes) < 60:
+            return {"error": "Not enough data available"}
+
+        return {"prices": closes}
+
+    except Exception:
+        return {"error": "Invalid stock symbol"}
+
 
 # -----------------------------
 # Root endpoint
@@ -61,3 +88,4 @@ def predict_price(data: PriceInput):
 @app.get("/")
 def root():
     return {"message": "API is running"}
+
